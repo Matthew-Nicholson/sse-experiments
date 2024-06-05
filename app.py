@@ -1,7 +1,20 @@
 import time
-from flask import Flask, Response
+from flask import Flask, Response, request
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///messages.db"
+db = SQLAlchemy(app)
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    author = db.Column(db.String(80), nullable=False)
+    message = db.Column(db.String(120), nullable=False)
+
+
+with app.app_context():
+    db.create_all()
 
 
 def event_stream():
@@ -20,6 +33,25 @@ def index():
 @app.route("/hello")
 def hello_world():
     return "Hello, World! \n"
+
+
+@app.route("/message", methods=["POST", "GET"])
+def message():
+    if request.method == "POST":
+        data = request.get_json()
+        message = data["message"]
+        author = data["author"]
+        new_message = Message(author=author, message=message)
+        db.session.add(new_message)
+        db.session.commit()
+        return "Success", 200
+    else:
+        return {
+            "messages": [
+                {"author": message.author, "message": message.message}
+                for message in Message.query.all()
+            ]
+        }, 200
 
 
 if __name__ == "__main__":
